@@ -1,0 +1,50 @@
+#include "driverlib.h"
+#include "mpu6050/Mpu-6050.h"
+#include "clk.h"
+#include"PWM.h"
+
+//#define duty_points 1000
+int main(void)
+{
+    float a;
+    //float b;
+    //float c;
+    int dutycycle;
+  WDT_A_hold(WDT_A_BASE);
+  InitMPU6050();
+  clk_Init ();
+  set_PWM(655);//使用ACLK32768hz，20ms
+
+
+
+
+  while(1)
+  {
+
+      a=Mpu6050AccelAngle(ACCEL_XOUT);
+      //b=Mpu6050AccelAngle(ACCEL_YOUT);
+      //c=Mpu6050AccelAngle(ACCEL_ZOUT);
+      dutycycle = abs((int)a*1.5)+17;
+
+      /*数据测量*/
+      /*
+      int i;
+      float signal1[duty_points];
+
+      for(i=0;i<duty_points;i++)
+      {
+          signal1[i] = a;
+      }
+      */
+      /********/
+
+      if (dutycycle < 17)
+      {
+          dutycycle = 17; // 如果结果小于500，将其修正为500
+      } else if (dutycycle > 85)
+      {
+          dutycycle = 85; // 如果结果大于2500，将其修正为2500
+      }
+      setPWM_duty_cycle(12,dutycycle);
+  }
+}

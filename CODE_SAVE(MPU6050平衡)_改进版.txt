@@ -1,0 +1,277 @@
+#include "driverlib.h"
+#include "mpu6050/Mpu-6050.h"
+#include "clk.h"
+#include"PWM_ACLK.h"
+#define LED BIT0 // LED连接到P1.0
+#define RXD BIT3 // RXD连接到P4.4
+#define TXD BIT4 // TXD连接到P4.5
+int bn;
+
+void UART_init(void)
+{
+    P3SEL |= RXD + TXD; // 配置P4.4和P4.5为UART模式
+
+    UCA0CTL1 |= UCSSEL_2; // 使用SMCLK作为UART时钟
+    UCA0BR0 = 52; // 设置波特率为9600（SMCLK=1MHz时）
+    UCA0BR1 = 0;
+    UCA0MCTL = UCBRS_1 + UCBRF_0 + UCOS16; // UCBRSx值为0x00
+
+    UCA0CTL1 &= ~UCSWRST; // 初始化UART
+    UCA0IE |= UCRXIE; // 启用UART接收中断
+}
+
+//#define duty_points 1000
+int main(void)
+{
+    /*三个变量分别为 x,y,z轴角度*/
+    float a;
+    float b;
+    //float c;
+
+    int dutycyclex_R,dutycyclex_L;
+    int dutycycley;
+
+  WDT_A_hold(WDT_A_BASE);
+  InitMPU6050();//MPU6050初始化，设置 接收速率
+  clk_Init ();  //配置时钟前 注意原本的时钟初始化
+  set_PWM(655);//使用ACLK32768hz，20ms
+
+  P1DIR |= LED; // 配置LED引脚为输出，用于观测蓝牙 串口连接情况，后期可删除
+  UART_init(); // 初始化UART
+
+  __bis_SR_register(GIE); // 启用全局中断（低功耗模式，暂时不管）
+
+  while(1)
+  {
+      a=Mpu6050AccelAngle(ACCEL_XOUT)-5; //-5为微调
+      b=Mpu6050AccelAngle(ACCEL_YOUT);
+      //c=Mpu6050AccelAngle(ACCEL_ZOUT);
+
+      if(a<0)
+      {
+          dutycyclex_R = 34-abs((int)a*0.5);
+          dutycyclex_L = 68-abs((int)a*0.5);
+          if (dutycyclex_R < 24)
+          {
+              dutycyclex_R = 24; // 如果结果小于500(17)，将其修正为500(17)
+          } else if (dutycyclex_R > 85)
+          {
+              dutycyclex_R = 85; // 如果结果大于2500，将其修正为2500
+          }
+          if (dutycyclex_L < 17)
+          {
+              dutycyclex_L = 17; // 如果结果小于500(17)，将其修正为500(17)
+          } else if (dutycyclex_L > 72)
+          {
+              dutycyclex_L = 72; // 如果结果大于2500，将其修正为2500
+          }
+      }
+      else if(a>0)
+      {
+          dutycyclex_R = 34+abs((int)a*0.5);
+          dutycyclex_L = 68+abs((int)a*0.5);
+          if (dutycyclex_R < 24)
+          {
+              dutycyclex_R = 24; // 如果结果小于500(17)，将其修正为500(17)
+          } else if (dutycyclex_R > 85)
+          {
+              dutycyclex_R = 85; // 如果结果大于2500，将其修正为2500
+          }
+          if (dutycyclex_L < 17)
+          {
+              dutycyclex_L = 17; // 如果结果小于500(17)，将其修正为500(17)
+          } else if (dutycyclex_L > 72)
+          {
+              dutycyclex_L = 72; // 如果结果大于2500，将其修正为2500
+          }
+      }
+
+//      if(b<0)
+//      {
+//          dutycycley = 51-abs((int)b*0.375);
+//      }
+//      else if(b>0)
+//      {
+//          dutycycley = 51+abs((int)b*0.375);
+//      }
+
+
+
+//      if (dutycycley < 17)
+//      {
+//          dutycycley = 17; // 如果结果小于500，将其修正为500
+//      } else if (dutycycley > 85)
+//      {
+//          dutycycley = 85; // 如果结果大于2500，将其修正为2500
+//      }
+      setPWM_duty_cycle(20,34);setPWM_duty_cycle(12,dutycyclex_R);//前右脚
+      setPWM_duty_cycle(21,30);setPWM_duty_cycle(13,dutycyclex_L);//前左脚
+      setPWM_duty_cycle(35,30);setPWM_duty_cycle(15,dutycyclex_R);//后右脚
+      setPWM_duty_cycle(24,34);setPWM_duty_cycle(14,dutycyclex_L);//后左脚
+  }
+}
+#pragma vector=USCI_A0_VECTOR
+__interrupt void USCI_A0_ISR(void)
+{
+    switch(__even_in_range(UCA0IV, USCI_A0_VECTOR))
+    {
+        case USCI_NONE: break;
+        case USCI_UCRXIFG: // UART接收中断
+            if (UCA0RXBUF == '1') // 如果收到'1'
+            {
+                P1OUT |= LED; // 点亮LED
+                bn=1;
+            }
+            else if (UCA0RXBUF == '0') // 如果收到'0'
+            {
+                P1OUT &= ~LED; // 熄灭LED
+                bn=0;
+            }
+            break;
+        default: break;
+    }
+}
+//修改日期：2022.6.17
+
+
+/*******************************
+            规范格式
+*******************************/
+//修改版
+#include "driverlib.h"
+#include "mpu6050/Mpu-6050.h"
+#include "clk.h"
+#include"PWM_ACLK.h"
+#define LED BIT0 // LED连接到P1.0
+#define RXD BIT3 // RXD连接到P4.4
+#define TXD BIT4 // TXD连接到P4.5
+int bn;
+
+void UART_init(void)
+{
+    P3SEL |= RXD + TXD; // 配置P4.4和P4.5为UART模式
+
+    UCA0CTL1 |= UCSSEL_2; // 使用SMCLK作为UART时钟
+    UCA0BR0 = 52; // 设置波特率为9600（SMCLK=1MHz时）
+    UCA0BR1 = 0;
+    UCA0MCTL = UCBRS_1 + UCBRF_0 + UCOS16; // UCBRSx值为0x00
+
+    UCA0CTL1 &= ~UCSWRST; // 初始化UART
+    UCA0IE |= UCRXIE; // 启用UART接收中断
+}
+
+//#define duty_points 1000
+int main(void)
+{
+    /*三个变量分别为 x,y,z轴角度*/
+    float a;
+    float b;
+    //float c;
+
+    //优化mpu6050,取数组1000个值的平均值,可以降低抖动幅度,防止极限值干扰
+    int angle[1000];
+    int angle_averge=0;
+    int dutycyclex_R,dutycyclex_L;
+    int dutycycley;
+    
+  WDT_A_hold(WDT_A_BASE);
+  InitMPU6050();//MPU6050初始化，设置 接收速率
+  clk_Init ();  //配置时钟前 注意原本的时钟初始化
+  set_PWM(655);//使用ACLK32768hz，20ms
+
+  P1DIR |= LED; // 配置LED引脚为输出，用于观测蓝牙 串口连接情况，后期可删除
+  UART_init(); // 初始化UART
+
+  __bis_SR_register(GIE); // 启用全局中断（低功耗模式，暂时不管）
+
+  while(1)
+  {
+      int i=0;
+      //if(bn==1) setPWM_duty_cycle(15,60);
+      //if(bn==0) setPWM_duty_cycle(15,34);
+      a=Mpu6050AccelAngle(ACCEL_XOUT);
+      b=Mpu6050AccelAngle(ACCEL_YOUT);
+      //c=Mpu6050AccelAngle(ACCEL_ZOUT);
+
+
+      /*X轴处理*/
+      for(i=0;i<1000;i++)
+      {
+          angle[i]=a;
+          angle_averge +=angle[i];
+      }
+      angle_averge /= 1000; //X轴倾斜角度 1000次测量的平均值
+      if(a<0)
+      {
+          dutycyclex_R = 34-abs((int)angle_averge*0.5);
+          dutycyclex_L = 68-abs((int)angle_averge*0.5);
+      }
+      else if(a>0)
+      {
+          dutycyclex_R = 34+abs((int)angle_averge*0.5);
+          dutycyclex_L = 68+abs((int)angle_averge*0.5);
+      }
+            //给出限定值
+            if (dutycyclex_R < 24)
+            {
+                dutycyclex_R = 24; // 如果结果小于500(17)，将其修正为500(17)
+            } else if (dutycyclex_R > 85)
+            {
+                dutycyclex_R = 85; // 如果结果大于2500，将其修正为2500
+            }
+            if (dutycyclex_L < 17)
+            {
+                dutycyclex_L = 17; // 如果结果小于500(17)，将其修正为500(17)
+            } else if (dutycyclex_L > 72)
+            {
+                dutycyclex_L = 72; // 如果结果大于2500，将其修正为2500
+            }
+
+    /*Y轴处理*/
+//      if(b<0)
+//      {
+//          dutycycley = 51-abs((int)b*0.375);
+//      }
+//      else if(b>0)
+//      {
+//          dutycycley = 51+abs((int)b*0.375);
+//      }
+//      if (dutycycley < 17)
+//      {
+//          dutycycley = 17; // 如果结果小于500，将其修正为500
+//      } else if (dutycycley > 85)
+//      {
+//          dutycycley = 85; // 如果结果大于2500，将其修正为2500
+//      }
+
+
+      setPWM_duty_cycle(20,34);setPWM_duty_cycle(12,dutycyclex_R);//前右脚
+      setPWM_duty_cycle(21,30);setPWM_duty_cycle(13,dutycyclex_L);//前左脚
+      setPWM_duty_cycle(35,30);setPWM_duty_cycle(15,dutycyclex_R);//后右脚
+      setPWM_duty_cycle(24,34);setPWM_duty_cycle(14,dutycyclex_L);//后左脚
+  }
+}
+
+//串口中断
+#pragma vector=USCI_A0_VECTOR
+__interrupt void USCI_A0_ISR(void)
+{
+    switch(__even_in_range(UCA0IV, USCI_A0_VECTOR))
+    {
+        case USCI_NONE: break;
+        case USCI_UCRXIFG: // UART接收中断
+            if (UCA0RXBUF == '1') // 如果收到'1'
+            {
+                P1OUT |= LED; // 点亮LED
+                bn=1;
+            }
+            else if (UCA0RXBUF == '0') // 如果收到'0'
+            {
+                P1OUT &= ~LED; // 熄灭LED
+                bn=0;
+            }
+            break;
+        default: break;
+    }
+}
+//修改日期：2022.6.16
