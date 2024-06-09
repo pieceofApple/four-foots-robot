@@ -1,2 +1,2 @@
 # four-foots-robot
-仿照github开源项目，采用MSP430F5529制作。
+solidwork建模采用开源项目，基于MSP430F5529制作。
